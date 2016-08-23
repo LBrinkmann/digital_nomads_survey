@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+import yaml
+import sklearn
+import sklearn.cluster
 
 def fetch():
     df = pd.read_excel('DNS 2015_16 (PUBLIC) Report.xlsx', 'results')
@@ -64,7 +67,7 @@ def preprocess(df):
                     df_types[col] = 'free'
             df.loc[~g_prop['indicator'], col] = np.nan
     df_types['#'] = 'index'
-    return df, df_types
+    return df, df_types, question_groups
 
 def get_data():
     df = fetch()
@@ -86,3 +89,41 @@ def get_interesting(df):
     iq2 = \
         df.columns[[3, 5, 9, 11, 30, 31, 43, 52, 61, 87, 88, 89, 90, 91]]
     return iq1, iq2
+
+
+def foo(sr, pos=-1):
+    sr.index = np.arange(sr.shape[0])
+    return sr[sr == 1].index.tolist()[-1]
+
+
+def cluster_pre(df, liqmc, sliq):
+
+    locin = ['less than 1 week', '1-2 weeks', '2-4 weeks', '1-3 month', '3-6 month',
+       '6-12 month', 'more than 12 months']
+
+    dfp = df.copy()
+    unordered = {col: df.loc[:, col].unique().tolist() for col in liqmc}
+    with open('resources/unordered.yml', 'w') as f:
+        yaml.dump(unordered, f, default_flow_style=False)
+    with open('resources/ordered.yml', 'r') as f:
+        ordered = yaml.load(f)
+    str_to_num = {coln: {ans: i for i, ans in enumerate(ass)}
+                  for coln, ass in ordered.items()}
+    num_to_str = {coln: {i: ans for i, ans in enumerate(ass)}
+                  for coln, ass in ordered.items()}
+    for col in liqmc:
+        dfp.loc[:,col] = dfp.loc[:,col] \
+                            .apply(lambda x: str_to_num[col][x]) \
+                            .astype(float)
+    dfps = dfp.loc[:, sliq]
+    # try:
+    #     dfps['min_stay'] = dfps[locin].apply(foo, axis=1, pos=0)
+    #     dfps['max_stay'] = dfps[locin].apply(foo, axis=1, pos=-1)
+    #     dfps = dfps.drop(locin,  axis=1)
+    # except:
+    #     pass
+    dfps = sklearn.preprocessing.Imputer(strategy='most_frequent').fit_transform(dfps)
+    dfps = sklearn.preprocessing.Normalizer().fit_transform(dfps)
+    # dfps = sklearn.preprocessing.RobustScaler().fit_transform(dfps)
+    # dfps[:,1] = dfps[:,1] * 2
+    return dfps
